@@ -13,20 +13,9 @@ class DatabaseManager {
 
   /**
    * Obtenir la configuration de la base de données
-   * Supporte Heroku JawsDB et configuration locale
    */
   getDatabaseConfig() {
-    // Si on est sur Heroku, utiliser DATABASE_URL
-    if (process.env.DATABASE_URL) {
-      console.log('🌐 Configuration Heroku détectée');
-      return {
-        uri: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
-      };
-    }
-    
-    // Configuration locale
-    console.log('🏠 Configuration locale détectée');
+    console.log('🏠 Configuration base de données');
     return {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
@@ -41,16 +30,8 @@ class DatabaseManager {
    */
   async getConnection() {
     if (!this.connection) {
-      // Utiliser createConnection ou createPool selon la configuration
-      if (this.config.uri) {
-        // Heroku JawsDB
-        this.connection = await mysql.createConnection(this.config.uri);
-        console.log('🔌 Connexion à JawsDB (Heroku) établie');
-      } else {
-        // Configuration locale
-        this.connection = await mysql.createConnection(this.config);
-        console.log('🔌 Connexion à MySQL locale établie');
-      }
+      this.connection = await mysql.createConnection(this.config);
+      console.log('🔌 Connexion à MySQL établie');
     }
     return this.connection;
   }

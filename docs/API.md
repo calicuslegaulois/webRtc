@@ -705,6 +705,6 @@ meeting = client.meetings.create(
 ## Support et Contribution
 
 - **Documentation** : Consultez les autres fichiers dans `/docs`
-- **Issues** : Signalez les bugs sur GitHub
-- **Contributions** : Les pull requests sont les bienvenues
+- **Bugs** : Signalez les bugs via le canal de support fourni
+- **Contributions** : Les contributions sont les bienvenues
 - **Support** : Contactez l'équipe de développement

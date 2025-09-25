@@ -9,8 +9,6 @@
     "dev:win": "powershell -Command \"$env:PORT=4000; npx nodemon server/index.js\"",
     "dev:simple": "node server/index.js",
     "init-db": "node scripts/init-db.js",
-    "heroku-migrate": "node scripts/heroku-migrate.js",
-    "postinstall": "npm run heroku-migrate",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

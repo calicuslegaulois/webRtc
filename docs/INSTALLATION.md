@@ -18,7 +18,7 @@
 
 ### 1. Cloner le projet
 ```bash
-git clone <repository-url>
+# Téléchargez ou copiez le dossier du projet sur votre machine
 cd webrtc-visioconf
 ```
 
@@ -287,7 +287,7 @@ artillery run tests/load-test.yml
 cp .env .env.backup
 
 # Mettre à jour le code
-git pull origin main
+# (mettez à jour vos fichiers locaux ou remplacez-les par la nouvelle version)
 
 # Mettre à jour les dépendances
 npm update
@@ -309,8 +309,7 @@ docker-compose up -d
 
 Pour obtenir de l'aide :
 1. Consultez la documentation complète dans `/docs`
-2. Vérifiez les issues sur GitHub
-3. Contactez l'équipe de développement
+2. Contactez l'équipe de développement
 
 ## Licence
 
