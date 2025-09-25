@@ -1179,8 +1179,8 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Serveur sécurisé démarré sur http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Serveur sécurisé démarré sur le port ${PORT}`);
   console.log(`🔒 Sécurité: Helmet, CORS, JWT activés`);
   console.log(`📹 Gestion des réunions et salles activée`);
   console.log(`💬 Service de chat en temps réel activé`);
