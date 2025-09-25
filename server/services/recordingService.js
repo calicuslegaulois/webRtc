@@ -12,7 +12,11 @@ class RecordingService {
     this.activeRecordings = new Map(); // meetingId -> { recordingId, participants, startTime, status }
     // Configuration de l'enregistrement
     this.config = {
-      recordingsDir: path.join(__dirname, '../../recordings'),
+      recordingsDir: process.env.RECORDINGS_PATH
+        ? path.resolve(process.env.RECORDINGS_PATH)
+        : (process.env.NODE_ENV === 'production'
+            ? '/tmp/recordings'
+            : path.join(__dirname, '../../recordings')),
       maxRecordingDuration: 4 * 60 * 60 * 1000, // 4 heures
       allowedFormats: ['webm', 'mp4'],
       compressionQuality: 0.8,
@@ -33,6 +37,17 @@ class RecordingService {
       console.log(`📹 Répertoire d'enregistrements initialisé: ${this.config.recordingsDir}`);
     } catch (error) {
       console.error('❌ Erreur lors de l\'initialisation du répertoire d\'enregistrements:', error);
+      // Fallback automatique vers /tmp/recordings en environnement type production/container
+      const fallbackDir = '/tmp/recordings';
+      if (this.config.recordingsDir !== fallbackDir) {
+        try {
+          await fs.mkdir(fallbackDir, { recursive: true });
+          this.config.recordingsDir = fallbackDir;
+          console.log(`✅ Dossier d'enregistrements de repli créé et utilisé: ${fallbackDir}`);
+        } catch (fallbackError) {
+          console.error('❌ Échec de la création du répertoire de repli /tmp/recordings:', fallbackError);
+        }
+      }
     }
   }
 
