@@ -22,7 +22,6 @@ EXPOSE 3000
 
 # Variables d'environnement
 ENV NODE_ENV=production
-ENV PORT=3000
 
 # Commande de démarrage
 CMD ["node", "server/index.js"]
