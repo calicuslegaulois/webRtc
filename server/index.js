@@ -43,6 +43,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+// Routes de santé / test
+app.get('/health', (req, res) => {
+  console.log('🟢 Route /health appelée');
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.get('/', (req, res) => {
+  console.log('🟢 Route / appelée');
+  res.send('Hello from Railway!');
+});
+
 // Routes d'authentification
 app.post("/api/auth/register", AuthController.register);
 app.post("/api/auth/login", AuthController.login);
