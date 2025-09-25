@@ -1,0 +1,55 @@
+{
+  "name": "webrtc-visioconf",
+  "version": "1.0.0",
+  "description": "Plateforme de visioconférence WebRTC sécurisée",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "npx nodemon server/index.js",
+    "dev:win": "powershell -Command \"$env:PORT=4000; npx nodemon server/index.js\"",
+    "dev:simple": "node server/index.js",
+    "init-db": "node scripts/init-db.js",
+    "heroku-migrate": "node scripts/heroku-migrate.js",
+    "postinstall": "npm run heroku-migrate",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "webrtc",
+    "visioconference",
+    "socket.io",
+    "nodejs"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.15.1",
+    "node-fetch": "^3.3.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "jest": "^30.1.1",
+    "nodemon": "^3.1.10",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.1.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "server/**/*.js",
+      "!server/**/*.test.js",
+      "!server/node_modules/**"
+    ],
+    "coverageDirectory": "coverage",
+    "testMatch": [
+      "**/__tests__/**/*.js",
+      "**/?(*.)+(spec|test).js"
+    ]
+  }
+}

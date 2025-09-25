@@ -1,0 +1,37 @@
+{
+  "name": "WebRTC VisioConf",
+  "description": "Plateforme de visioconférence WebRTC sécurisée",
+  "repository": "https://github.com/votre-username/webrtc-visioconf",
+  "logo": "https://cdn.jsdelivr.net/npm/simple-icons@v3/icons/webrtc.svg",
+  "keywords": ["webrtc", "visioconference", "nodejs", "socket.io"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environnement d'exécution",
+      "value": "production"
+    },
+    "JWT_SECRET": {
+      "description": "Clé secrète pour JWT",
+      "generator": "secret"
+    },
+    "DATABASE_URL": {
+      "description": "URL de connexion à la base de données MySQL"
+    }
+  },
+  "addons": [
+    {
+      "plan": "jawsdb:kitefin",
+      "as": "JAWSDB"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  }
+}

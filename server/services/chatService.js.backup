@@ -1,0 +1,721 @@
+const { PrismaClient } = require('@prisma/client');
+
+/**
+ * Service de gestion du chat en temps réel
+ * Gère les messages, les réactions, et l'historique du chat
+ */
+class ChatService {
+  constructor() {
+    // Plus besoin de stockage en mémoire - tout est en base de données
+    // Configuration du chat
+    this.config = {
+      maxMessages: 1000, // Nombre maximum de messages par conversation
+      messageRetention: 24 * 60 * 60 * 1000, // 24 heures en millisecondes
+      maxMessageLength: 1000,
+      allowedEmojis: ['👍', '👏', '❤️', '😂', '😮', '😢', '😡', '🎉', '👎']
+    };
+  }
+
+  // Obtenir une instance Prisma
+  getPrisma() {
+    const { PrismaClient } = require('@prisma/client');
+    return new PrismaClient();
+  }
+
+  /**
+   * Initialiser le chat pour une réunion
+   * @param {string} meetingId - ID de la réunion
+   * @param {Array} participants - Liste des participants
+   */
+  async initializeChat(meetingId, participants = []) {
+    const prisma = this.getPrisma();
+    try {
+      // Vérifier si la réunion existe
+      const meeting = await prisma.instantMeeting.findUnique({
+        where: { id: meetingId }
+      });
+      
+      if (!meeting) {
+        throw new Error('Réunion non trouvée');
+      }
+      
+      console.log(`💬 Chat initialisé pour la réunion ${meetingId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Ajouter un participant au chat
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} userId - ID de l'utilisateur
+   */
+  async addParticipant(meetingId, userId) {
+    const prisma = this.getPrisma();
+    try {
+      // Vérifier que la réunion existe
+      const meeting = await prisma.instantMeeting.findUnique({
+        where: { id: meetingId, status: 'active' }
+      });
+      
+      if (!meeting) {
+        throw new Error('Réunion non trouvée ou fermée');
+      }
+      
+      console.log(`👤 ${userId} ajouté au chat de ${meetingId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Retirer un participant du chat
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} userId - ID de l'utilisateur
+   */
+  async removeParticipant(meetingId, userId) {
+    const prisma = this.getPrisma();
+    try {
+      // Retirer la main levée si applicable
+      await this.lowerHand(meetingId, userId);
+      console.log(`👤 ${userId} retiré du chat de ${meetingId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Envoyer un message dans le chat
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} userId - ID de l'utilisateur
+   * @param {string} username - Nom d'utilisateur
+   * @param {string} message - Contenu du message
+   * @param {string} type - Type de message (text, system, announcement)
+   * @returns {Object} Message créé
+   */
+  async sendMessage(meetingId, userId, username, message, type = 'text') {
+    const prisma = this.getPrisma();
+    try {
+      // Vérifier que la réunion existe
+      const meeting = await prisma.instantMeeting.findUnique({
+        where: { id: meetingId, status: 'active' }
+      });
+      
+      if (!meeting) {
+        throw new Error('Chat non trouvé pour cette réunion');
+      }
+
+      // Validation du message
+      if (!message || message.trim().length === 0) {
+        throw new Error('Le message ne peut pas être vide');
+      }
+
+      if (message.length > this.config.maxMessageLength) {
+        throw new Error(`Le message ne peut pas dépasser ${this.config.maxMessageLength} caractères`);
+      }
+
+      // Nettoyer le message (protection XSS basique)
+      const cleanMessage = this.sanitizeMessage(message);
+
+      // Créer le message en base de données
+      const messageObj = await prisma.chatMessage.create({
+        data: {
+          meetingId,
+          userId: userId || null,
+          username,
+          message: cleanMessage,
+          type,
+          edited: false
+        }
+      });
+
+      // Nettoyer les anciens messages si nécessaire
+      await this.cleanupOldMessages(meetingId);
+
+      console.log(`💬 Message envoyé par ${username} dans ${meetingId}: ${cleanMessage.substring(0, 50)}...`);
+
+      return messageObj;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  /**
+   * Ajouter une réaction à un message
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} messageId - ID du message
+   * @param {string} userId - ID de l'utilisateur
+   * @param {string} emoji - Emoji de réaction
+   * @returns {Object} Réaction créée
+   */
+  async addReaction(meetingId, messageId, userId, emoji) {
+    const prisma = this.getPrisma();
+    try {
+      // Vérifier que l'emoji est autorisé
+      if (!this.config.allowedEmojis.includes(emoji)) {
+        throw new Error('Emoji non autorisé');
+      }
+
+      // Vérifier que le message existe
+      const message = await prisma.chatMessage.findUnique({
+        where: { id: messageId, meetingId }
+      });
+      
+      if (!message) {
+        throw new Error('Message non trouvé');
+      }
+
+      // Vérifier si la réaction existe déjà
+      const existingReaction = await prisma.messageReaction.findUnique({
+        where: {
+          messageId_userId_emoji: {
+            messageId,
+            userId,
+            emoji
+          }
+        }
+      });
+
+      if (existingReaction) {
+        throw new Error('Réaction déjà ajoutée');
+      }
+
+      // Créer la réaction
+      await prisma.messageReaction.create({
+        data: {
+          messageId,
+          userId,
+          emoji
+        }
+      });
+
+      // Compter les réactions pour cet emoji
+      const count = await prisma.messageReaction.count({
+        where: { messageId, emoji }
+      });
+
+      console.log(`😊 Réaction ${emoji} ajoutée par ${userId} au message ${messageId}`);
+
+      return {
+        messageId,
+        emoji,
+        count,
+        users: await this.getReactionUsers(messageId, emoji)
+      };
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur add reaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retirer une réaction d'un message
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} messageId - ID du message
+   * @param {string} userId - ID de l'utilisateur
+   * @param {string} emoji - Emoji de réaction
+   * @returns {Object} Réaction mise à jour
+   */
+  async removeReaction(meetingId, messageId, userId, emoji) {
+    const prisma = this.getPrisma();
+    try {
+      // Supprimer la réaction
+      const deletedReaction = await prisma.messageReaction.deleteMany({
+        where: {
+          messageId,
+          userId,
+          emoji
+        }
+      });
+
+      if (deletedReaction.count === 0) {
+        return null;
+      }
+
+      // Compter les réactions restantes pour cet emoji
+      const count = await prisma.messageReaction.count({
+        where: { messageId, emoji }
+      });
+
+      return {
+        messageId,
+        emoji,
+        count,
+        users: await this.getReactionUsers(messageId, emoji)
+      };
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur remove reaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lever la main dans une réunion
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} userId - ID de l'utilisateur
+   * @param {string} username - Nom d'utilisateur
+   * @returns {boolean} True si la main a été levée
+   */
+  async raiseHand(meetingId, userId, username) {
+    const prisma = this.getPrisma();
+    try {
+      // Vérifier si la main est déjà levée
+      const existingHand = await prisma.raisedHand.findFirst({
+        where: {
+          meetingId,
+          OR: [
+            { userId },
+            { username: userId } // Fallback si userId est en fait un username
+          ],
+          loweredAt: null
+        }
+      });
+
+      if (existingHand) {
+        return false; // Main déjà levée
+      }
+
+      // Créer l'entrée de main levée
+      await prisma.raisedHand.create({
+        data: {
+          meetingId,
+          userId: userId || null,
+          username
+        }
+      });
+      
+      // Ajouter un message système
+      await this.sendMessage(meetingId, userId, username, `${username} a levé la main`, 'system');
+      
+      console.log(`✋ ${username} a levé la main dans ${meetingId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur raise hand:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Baisser la main dans une réunion
+   * @param {string} meetingId - ID de la réunion
+   * @param {string} userId - ID de l'utilisateur
+   * @param {string} username - Nom d'utilisateur
+   * @returns {boolean} True si la main a été baissée
+   */
+  async lowerHand(meetingId, userId, username) {
+    const prisma = this.getPrisma();
+    try {
+      // Trouver la main levée active
+      const raisedHand = await prisma.raisedHand.findFirst({
+        where: {
+          meetingId,
+          OR: [
+            { userId },
+            { username: userId } // Fallback si userId est en fait un username
+          ],
+          loweredAt: null
+        }
+      });
+
+      if (!raisedHand) {
+        return false; // Aucune main levée trouvée
+      }
+
+      // Marquer la main comme baissée
+      await prisma.raisedHand.update({
+        where: { id: raisedHand.id },
+        data: { loweredAt: new Date() }
+      });
+      
+      // Ajouter un message système
+      await this.sendMessage(meetingId, userId, username, `${username} a baissé la main`, 'system');
+      
+      console.log(`✋ ${username} a baissé la main dans ${meetingId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur lower hand:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir les messages d'un chat
+   * @param {string} meetingId - ID de la réunion
+   * @param {number} limit - Nombre maximum de messages à retourner
+   * @param {Date} since - Récupérer les messages depuis cette date
+   * @returns {Array} Liste des messages
+   */
+  async getMessages(meetingId, limit = 50, since = null) {
+    const prisma = this.getPrisma();
+    try {
+      const whereClause = { meetingId };
+      
+      if (since) {
+        whereClause.timestamp = { gt: since };
+      }
+
+      const messages = await prisma.chatMessage.findMany({
+        where: whereClause,
+        orderBy: { timestamp: 'asc' },
+        take: limit || undefined,
+        include: {
+          reactions: {
+            select: {
+              userId: true,
+              emoji: true
+            }
+          }
+        }
+      });
+
+      // Grouper les réactions par emoji
+      return messages.map(msg => ({
+        id: msg.id,
+        meetingId: msg.meetingId,
+        userId: msg.userId,
+        username: msg.username,
+        message: msg.message,
+        type: msg.type,
+        timestamp: msg.timestamp,
+        edited: msg.edited,
+        editedAt: msg.editedAt,
+        reactions: this.groupReactionsByEmoji(msg.reactions)
+      }));
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur get messages:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtenir les utilisateurs qui ont levé la main
+   * @param {string} meetingId - ID de la réunion
+   * @returns {Array} Liste des utilisateurs avec la main levée
+   */
+  async getRaisedHands(meetingId) {
+    const prisma = this.getPrisma();
+    try {
+      const raisedHands = await prisma.raisedHand.findMany({
+        where: {
+          meetingId,
+          loweredAt: null
+        },
+        select: {
+          userId: true,
+          username: true,
+          raisedAt: true
+        }
+      });
+
+      return raisedHands;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur get raised hands:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtenir les statistiques d'un chat
+   * @param {string} meetingId - ID de la réunion
+   * @returns {Object} Statistiques du chat
+   */
+  async getChatStats(meetingId) {
+    const prisma = this.getPrisma();
+    try {
+      const meeting = await prisma.instantMeeting.findUnique({
+        where: { id: meetingId },
+        include: {
+          participants: {
+            where: { leftAt: null }
+          },
+          messages: true,
+          raisedHands: {
+            where: { loweredAt: null }
+          }
+        }
+      });
+
+      if (!meeting) {
+        return null;
+      }
+
+      // Compter les messages par utilisateur
+      const messagesByUser = {};
+      const messageTypes = {};
+      
+      meeting.messages.forEach(msg => {
+        const userId = msg.userId || 'anonymous';
+        messagesByUser[userId] = (messagesByUser[userId] || 0) + 1;
+        messageTypes[msg.type] = (messageTypes[msg.type] || 0) + 1;
+      });
+
+      // Compter les réactions
+      const totalReactions = await prisma.messageReaction.count({
+        where: {
+          message: { meetingId }
+        }
+      });
+
+      return {
+        totalMessages: meeting.messages.length,
+        totalParticipants: meeting.participants.length,
+        messagesByUser,
+        messageTypes,
+        totalReactions,
+        createdAt: meeting.createdAt,
+        lastActivity: meeting.messages.length > 0 ? 
+          meeting.messages[meeting.messages.length - 1].timestamp : 
+          meeting.createdAt,
+        raisedHands: meeting.raisedHands.length
+      };
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur get chat stats:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Nettoyer un message (protection XSS basique)
+   * @param {string} message - Message à nettoyer
+   * @returns {string} Message nettoyé
+   */
+  sanitizeMessage(message) {
+    return message
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;')
+      .trim();
+  }
+
+  /**
+   * Nettoyer les messages anciens d'une réunion
+   * @param {string} meetingId - ID de la réunion
+   */
+  async cleanupOldMessages(meetingId) {
+    const prisma = this.getPrisma();
+    try {
+      const messageCount = await prisma.chatMessage.count({
+        where: { meetingId }
+      });
+
+      if (messageCount > this.config.maxMessages) {
+        const messagesToDelete = messageCount - this.config.maxMessages;
+        
+        // Supprimer les plus anciens messages
+        const oldestMessages = await prisma.chatMessage.findMany({
+          where: { meetingId },
+          orderBy: { timestamp: 'asc' },
+          take: messagesToDelete,
+          select: { id: true }
+        });
+
+        const messageIds = oldestMessages.map(msg => msg.id);
+        
+        // Supprimer les réactions associées
+        await prisma.messageReaction.deleteMany({
+          where: { messageId: { in: messageIds } }
+        });
+
+        // Supprimer les messages
+        await prisma.chatMessage.deleteMany({
+          where: { id: { in: messageIds } }
+        });
+
+        console.log(`🧹 ${messagesToDelete} anciens messages supprimés de ${meetingId}`);
+      }    } finally {
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error('❌ Erreur cleanup messages:', error);
+    }
+  }
+
+  /**
+   * Nettoyer les chats anciens
+   * @param {number} maxAge - Âge maximum en millisecondes
+   */
+  async cleanupOldChats(maxAge = this.config.messageRetention) {
+    const prisma = this.getPrisma();
+    try {
+      const cutoffDate = new Date(Date.now() - maxAge);
+      
+      // Marquer les réunions anciennes comme fermées
+      const result = await prisma.instantMeeting.updateMany({
+        where: {
+          status: 'active',
+          createdAt: { lt: cutoffDate }
+        },
+        data: {
+          status: 'ended',
+          endedAt: new Date()
+        }
+      });
+
+      console.log(`🧹 ${result.count} réunions anciennes fermées`);
+      return result.count;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur cleanup chats:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Fermer le chat d'une réunion
+   * @param {string} meetingId - ID de la réunion
+   */
+  async closeChat(meetingId) {
+    const prisma = this.getPrisma();
+    try {
+      await prisma.instantMeeting.update({
+        where: { id: meetingId },
+        data: {
+          status: 'ended',
+          endedAt: new Date()
+        }
+      });
+
+      console.log(`🔒 Chat fermé pour la réunion ${meetingId}`);    } finally {
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error('❌ Erreur close chat:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtenir toutes les conversations actives
+   * @returns {Array} Liste des conversations actives
+   */
+  async getActiveChats() {
+    const prisma = this.getPrisma();
+    try {
+      const activeMeetings = await prisma.instantMeeting.findMany({
+        where: { status: 'active' },
+        select: { id: true }
+      });
+
+      const chatsWithStats = await Promise.all(
+        activeMeetings.map(async (meeting) => ({
+          meetingId: meeting.id,
+          stats: await this.getChatStats(meeting.id)
+        }))
+      );
+
+      return chatsWithStats;
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur get active chats:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Grouper les réactions par emoji
+   * @param {Array} reactions - Liste des réactions
+   * @returns {Object} Réactions groupées par emoji
+   */
+  groupReactionsByEmoji(reactions) {
+    const grouped = {};
+    
+    reactions.forEach(reaction => {
+      if (!grouped[reaction.emoji]) {
+        grouped[reaction.emoji] = {
+          count: 0,
+          users: []
+        };
+      }
+      grouped[reaction.emoji].count++;
+      grouped[reaction.emoji].users.push(reaction.userId);
+    });
+
+    return grouped;
+  }
+
+  /**
+   * Obtenir les utilisateurs d'une réaction
+   * @param {string} messageId - ID du message
+   * @param {string} emoji - Emoji
+   * @returns {Array} Liste des utilisateurs
+   */
+  async getReactionUsers(messageId, emoji) {
+    const prisma = this.getPrisma();
+    try {
+      const reactions = await prisma.messageReaction.findMany({
+        where: { messageId, emoji },
+        select: { userId: true }
+      });
+
+      return reactions.map(r => r.userId);
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      throw error;
+    } finally {
+      await prisma.$disconnect();
+    }
+      console.error('❌ Erreur get reaction users:', error);
+      return [];
+    }
+  }
+}
+
+module.exports = ChatService;

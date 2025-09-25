@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC VisioConf - Visioconférence en temps réel</title>
+  <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Interface d'authentification -->
+    <div id="auth-container" class="auth-container">
+        <div class="auth-card">
+      <div class="auth-header">
+                <h1>Connexion</h1>
+                <p>Accédez à votre espace de visioconférence</p>
+      </div>
+      
+            <!-- Formulaire de connexion -->
+            <div id="login-form-container" class="form-container">
+                <form id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" name="email" required>
+        </div>
+                    <div class="form-group">
+                        <label for="login-password">Mot de passe</label>
+                        <input type="password" id="login-password" name="password" required>
+          </div>
+                    <button type="submit" class="btn btn-primary">Se connecter</button>
+        </form>
+                <p class="auth-switch">
+                    Pas de compte ? <a href="#" id="show-register-link">S'inscrire</a>
+                </p>
+      </div>
+      
+            <!-- Formulaire d'inscription -->
+            <div id="register-form-container" class="form-container" style="display: none;">
+                <form id="register-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="register-username">Nom d'utilisateur</label>
+                        <input type="text" id="register-username" name="username" required>
+        </div>
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" name="email" required>
+        </div>
+                    <div class="form-group">
+                        <label for="register-password">Mot de passe</label>
+                        <input type="password" id="register-password" name="password" required>
+        </div>
+                    <button type="submit" class="btn btn-primary">S'inscrire</button>
+                </form>
+                <p class="auth-switch">
+                    Déjà un compte ? <a href="#" id="show-login-link">Se connecter</a>
+                </p>
+            </div>
+          </div>
+        </div>
+
+    <!-- Interface principale -->
+    <div id="main-container" class="main-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-video"></i>
+                    <h1>WebRTC Visio</h1>
+            </div>
+                <div class="user-info">
+                    <span id="home-username">Utilisateur</span>
+                    <button id="btnLogout" class="btn btn-secondary" style="display:none;">Déconnexion</button>
+            </div>
+            </div>
+        </header>
+
+        <!-- Contenu principal (style Zoom) -->
+        <main class="main-content zoom-layout">
+            <aside class="zoom-sidebar">
+                <button class="zoom-nav-btn active" data-view="dashboard"><i class="fas fa-home"></i> Accueil</button>
+                <button class="zoom-nav-btn" data-view="schedule"><i class="fas fa-calendar-plus"></i> Planifier</button>
+                <button class="zoom-nav-btn" data-view="my-meetings"><i class="fas fa-video"></i> Mes réunions</button>
+                <button class="zoom-nav-btn" data-view="recordings"><i class="fas fa-circle"></i> Enregistrements</button>
+                <button class="zoom-nav-btn" data-view="calendar"><i class="fas fa-calendar"></i> Calendrier</button>
+            </aside>
+
+            <section class="zoom-content">
+                <div id="view-dashboard" class="zoom-view">
+                    <div class="welcome-section">
+                        <h2>Bienvenue dans votre espace de visioconférence</h2>
+                        <p>Créez, planifiez ou rejoignez une réunion</p>
+                    </div>
+                    <div class="quick-actions">
+                        <button id="create-meeting-btn" class="action-card">
+                            <i class="fas fa-plus-circle"></i>
+                            <h3>Démarrer une réunion</h3>
+                            <p>Lancez une réunion instantanée</p>
+                        </button>
+                        <button id="join-meeting-btn-home" class="action-card">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <h3>Rejoindre</h3>
+                            <p>Rejoignez une réunion existante</p>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="view-schedule" class="zoom-view hidden">
+                    <h3>Planifier une réunion</h3>
+                    <form id="schedule-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="sch-title">Titre</label>
+                            <input id="sch-title" type="text" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sch-date">Date et heure</label>
+                            <input id="sch-date" type="datetime-local" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sch-duration">Durée (minutes)</label>
+                            <input id="sch-duration" type="number" min="15" step="15" value="60" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sch-password">Mot de passe (optionnel)</label>
+                            <input id="sch-password" type="text" placeholder="facultatif">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Planifier</button>
+                    </form>
+                </div>
+
+                <div id="view-my-meetings" class="zoom-view hidden">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-scope="upcoming">À venir</button>
+                        <button class="tab-btn" data-scope="past">Passées</button>
+                    </div>
+                    <div id="my-meetings-list" class="list"></div>
+                </div>
+
+                <div id="view-recordings" class="zoom-view hidden">
+                    <h3>Mes enregistrements</h3>
+                    <div id="my-recordings-list" class="list"></div>
+                </div>
+
+                <div id="view-calendar" class="zoom-view hidden">
+                    <h3>Calendrier</h3>
+                    <div id="calendar-grid" class="calendar-grid"></div>
+                </div>
+
+                <!-- Éditer une réunion -->
+                <div id="view-edit" class="zoom-view hidden">
+                    <h3>Éditer la réunion</h3>
+                    <form id="edit-form" class="auth-form">
+                        <input id="edit-id" type="hidden">
+                        <div class="form-group">
+                            <label for="edit-title">Titre</label>
+                            <input id="edit-title" type="text" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-date">Date et heure</label>
+                            <input id="edit-date" type="datetime-local" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-duration">Durée (minutes)</label>
+                            <input id="edit-duration" type="number" min="15" step="15" value="60" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-password">Mot de passe (optionnel)</label>
+                            <input id="edit-password" type="text" placeholder="facultatif">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <button type="button" id="edit-cancel" class="btn btn-secondary">Annuler</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Fonctionnalités</h4>
+                    <ul>
+                        <li>Visioconférence HD</li>
+                        <li>Partage d'écran</li>
+                        <li>Chat en temps réel</li>
+                        <li>Enregistrement</li>
+                    </ul>
+                  </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li>Aide</li>
+                        <li>Contact</li>
+                        <li>Documentation</li>
+                    </ul>
+              </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Interface de réunion -->
+    <div id="meeting-container" class="meeting-container hidden">
+        <!-- Header de la réunion -->
+        <div class="meeting-header">
+            <div class="meeting-info">
+                <span class="meeting-title">Réunion instantanée</span>
+                <div class="meeting-id-display">
+                    <span>ID: </span>
+                    <span id="meeting-id-display" class="meeting-id-text">F6P6F2A5A</span>
+                    <button id="copy-meeting-id" class="copy-id-btn" title="Copier l'ID">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="meeting-timer">00:00:07</div>
+                <div class="participant-count">
+                    <i class="fas fa-users"></i>
+                    <span>1</span>
+                </div>
+            </div>
+            
+            <div class="meeting-actions">
+                <button class="btn-header" id="invite-btn">
+                    <i class="fas fa-user-plus"></i>
+                    + Inviter
+                </button>
+                <button class="btn-header" id="participants-btn">
+                    <i class="fas fa-users"></i>
+                    Participants
+                </button>
+                <button class="btn-header" id="chat-btn">
+                    <i class="fas fa-comments"></i>
+                    Chat
+                </button>
+                <button class="btn-header" id="share-btn">
+                    <i class="fas fa-desktop"></i>
+                    Partager
+                </button>
+                <button class="btn-header" id="record-btn">
+                    <i class="fas fa-circle"></i>
+                    Enregistrer
+                </button>
+                <button class="btn-header" id="recordings-btn">
+                    <i class="fas fa-video"></i>
+                    Enregistrements
+                </button>
+                <button class="btn-header" id="more-btn">
+                    <i class="fas fa-ellipsis-h"></i>
+                    ... Plus
+                </button>
+                <button class="btn-header" id="minimize-btn">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Zone vidéo principale -->
+        <div class="video-container">
+            <!-- Layout normal (style grille) -->
+            <div id="videoGrid" class="video-grid">
+                <!-- Vignette principale (participant distant) -->
+                <div class="video-item main-video" id="remoteVideoContainer">
+                    <div class="video-placeholder" id="remoteVideoPlaceholder">
+                        <i class="fas fa-user" style="font-size: 64px; opacity: 0.3;"></i>
+                        <span style="font-size: 18px; margin-top: 16px;">En attente de participants...</span>
+                    </div>
+                    <video id="remoteVideo" autoplay style="display: none;"></video>
+                    <div class="video-label" id="remoteVideoLabel" style="display: none;">Participant</div>
+                    <div class="video-status" id="remoteVideoStatus" style="display: none;">
+                        <div class="status-icon mic">
+                            <i class="fas fa-microphone-slash"></i>
+                        </div>
+                        <div class="status-icon camera">
+                            <i class="fas fa-video-slash"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Vignette locale (vous) -->
+                <div class="video-item local-video" id="localVideoContainer">
+                    <video id="localVideo" autoplay muted></video>
+                    <div class="video-label">Vous</div>
+                    <div class="video-status">
+                        <div class="status-icon mic active" id="localMicStatus">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <div class="status-icon camera active" id="localCameraStatus">
+                            <i class="fas fa-video"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layout de partage d'écran (style Zoom) -->
+            <div id="screenShareLayout" class="screen-share-layout" style="display: none;">
+                <!-- Zone principale pour l'écran partagé -->
+                <div class="screen-share-main" id="screenShareMain">
+                    <video id="screenShareVideo" autoplay style="display: none;"></video>
+                    <div class="screen-share-info" id="screenShareInfo">
+                        <i class="fas fa-desktop"></i>
+                        <span id="screenShareUser">Quelqu'un partage son écran</span>
+                    </div>
+                    <div class="screen-share-controls" id="screenShareControls">
+                        <button class="control-btn" id="pauseScreenShare" title="Mettre en pause">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="control-btn" id="resumeScreenShare" title="Reprendre" style="display: none;">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button class="control-btn stop-share" id="stopScreenShare" title="Arrêter le partage">
+                            <i class="fas fa-stop"></i>
+                            Arrêter le partage
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Vignettes des participants -->
+                <div class="participants-thumbnails" id="participantsThumbnails">
+                    <!-- Les vignettes seront ajoutées dynamiquement -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Contrôles du bas -->
+        <div class="meeting-controls">
+            <div class="controls-container">
+                <!-- Microphone -->
+                <button id="btnToggleMic" class="control-btn mic-btn active" title="Activer/Désactiver le microphone">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                
+                <!-- Camera -->
+                <button id="btnToggleCam" class="control-btn cam-btn active" title="Activer/Désactiver la caméra">
+                    <i class="fas fa-video"></i>
+                </button>
+                
+                <!-- Séparateur -->
+                <div class="control-separator"></div>
+                
+                <!-- Chat -->
+                <button class="control-btn chat-btn active" id="chat-control-btn" title="Ouvrir le chat">
+                    <i class="fas fa-comments"></i>
+                </button>
+                
+                <!-- Participants -->
+                <button class="control-btn participants-btn" id="participants-control-btn" title="Voir les participants">
+                    <i class="fas fa-users"></i>
+                </button>
+                
+                <!-- Share Screen -->
+                <button class="control-btn share-btn" id="btnShareScreen" title="Partager l'écran">
+                    <i class="fas fa-desktop"></i>
+                </button>
+                
+                <!-- Record -->
+                <button class="control-btn record-btn" id="record-control-btn" title="Enregistrer la réunion">
+                    <i class="fas fa-circle"></i>
+                </button>
+                
+                <!-- Raise Hand -->
+                <button class="control-btn hand-btn" id="hand-btn" title="Lever la main">
+                    <i class="fas fa-hand-paper"></i>
+                </button>
+
+                <!-- Indicateur d'enregistrement -->
+                <div id="recording-indicator" class="recording-indicator hidden">
+                    <div class="recording-dot"></div>
+                    <span id="recording-timer">00:00</span>
+                    <span class="recording-text">ENREGISTREMENT</span>
+                </div>
+                
+                <!-- More Options -->
+                <div class="more-options-container">
+                    <button class="control-btn more-btn" id="more-control-btn" title="Plus d'options">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                    
+                    <!-- Menu déroulant des options -->
+                    <div id="more-options-menu" class="more-options-menu hidden">
+                        <div class="more-options-item" id="btnShareFile">
+                            <i class="fas fa-paperclip"></i>
+                            <span>Partager un fichier</span>
+                        </div>
+                        <div class="more-options-item">
+                            <i class="fas fa-cog"></i>
+                            <span>Paramètres</span>
+                        </div>
+                        <div class="more-options-item">
+                            <i class="fas fa-info-circle"></i>
+                            <span>À propos</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Séparateur -->
+                <div class="control-separator"></div>
+                
+                <!-- Leave Meeting -->
+                <button id="btnLeave" class="control-btn leave-btn" title="Quitter la réunion">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Panneau latéral -->
+        <div id="sidePanel" class="side-panel hidden">
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="participants">
+              <i class="fas fa-users"></i>
+                    Participants
+            </button>
+                <button class="tab-btn" data-tab="chat">
+              <i class="fas fa-comments"></i>
+                    Chat
+          </button>
+        </div>
+        
+            <div class="panel-content">
+                <div id="participants-tab" class="tab-content">
+                    <div class="participants-header">
+                        <div class="participants-title">
+                            <i class="fas fa-users"></i>
+                            <span>Participants (1)</span>
+            </div>
+                        <div class="participants-actions">
+                            <button id="invite-participants-btn" class="participants-action-btn" title="Inviter des participants">
+                                <i class="fas fa-user-plus"></i>
+                            </button>
+                            <button id="participants-settings-btn" class="participants-action-btn" title="Paramètres des participants">
+                                <i class="fas fa-cog"></i>
+              </button>
+            </div>
+          </div>
+                    
+                    <div class="participants-search">
+                        <div class="search-wrapper">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="participants-search-input" placeholder="Rechercher un participant...">
+      </div>
+    </div>
+
+                    <div id="participants-list" class="participants-list">
+                        <div class="participant-item">
+                            <div class="participant-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="participant-info">
+                                <div class="participant-name">Vous</div>
+                                <div class="participant-status">
+                                    <span class="status-indicator online"></span>
+                                    <span class="status-text">En ligne</span>
+        </div>
+      </div>
+                            <div class="participant-actions">
+                                <button class="participant-action-btn" title="Plus d'options">
+                                    <i class="fas fa-ellipsis-v"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+          </div>
+          
+                <div id="chat-tab" class="tab-content active">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <i class="fas fa-comments"></i>
+                            <span>Chat de la réunion</span>
+            </div>
+                        <div class="chat-actions">
+                            <button id="clear-chat-btn" class="chat-action-btn" title="Effacer le chat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button id="chat-settings-btn" class="chat-action-btn" title="Paramètres du chat">
+                                <i class="fas fa-cog"></i>
+        </button>
+    </div>
+  </div>
+
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-welcome">
+                            <i class="fas fa-comment-dots"></i>
+                            <p>Bienvenue dans le chat de la réunion</p>
+                            <small>Vos messages apparaîtront ici</small>
+    </div>
+  </div>
+
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <button id="emoji-btn" class="chat-emoji-btn" title="Ajouter un emoji">
+                                <i class="fas fa-smile"></i>
+                </button>
+                            <input type="text" id="chat-input" placeholder="Tapez votre message..." maxlength="500">
+                            <button id="attach-btn" class="chat-attach-btn" title="Joindre un fichier">
+                                <i class="fas fa-paperclip"></i>
+              </button>
+            </div>
+                        <button id="send-message-btn" class="chat-send-btn">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Modal Plus d'options -->
+    <div id="more-options-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+                <h3>Plus d'options</h3>
+                <button class="close-btn" id="close-more-options">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+            <div class="modal-body">
+                <div class="option-item" id="invite-participants">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Inviter des participants</span>
+          </div>
+                <div class="option-item" id="meeting-settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Paramètres de réunion</span>
+                </div>
+                <div class="option-item" id="share-social">
+                    <i class="fas fa-share"></i>
+                    <span>Partager sur les réseaux sociaux</span>
+                </div>
+                <div class="option-item" id="download-recording">
+                    <i class="fas fa-download"></i>
+                    <span>Télécharger l'enregistrement</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    <!-- Modal des enregistrements -->
+    <div id="recordings-modal" class="modal hidden">
+        <div class="zoom-join-modal">
+            <div class="zoom-join-header">
+                <h2>Mes Enregistrements</h2>
+                <button class="zoom-close-btn" id="close-recordings-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="recordings-content">
+                <div class="recordings-list" id="recordingsList">
+                    <!-- Les enregistrements seront générés dynamiquement ici -->
+                    <div class="no-recordings">
+                        <i class="fas fa-video-slash"></i>
+                        <p>Aucun enregistrement disponible</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de rejoindre une réunion - Style Zoom -->
+    <div id="join-meeting-modal" class="modal hidden">
+        <div class="zoom-join-modal">
+            <div class="zoom-join-header">
+                <h2>Rejoindre une réunion</h2>
+                <button class="zoom-close-btn" id="close-join-meeting-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="zoom-join-content">
+                <!-- Formulaire de connexion -->
+                <div class="zoom-join-form">
+                    <div class="zoom-form-group">
+                        <label for="join-meeting-id">ID de la réunion</label>
+                        <input type="text" id="join-meeting-id" placeholder="Entrez l'ID de la réunion">
+                    </div>
+                    
+                    <div class="zoom-form-group">
+                        <label for="join-name">Votre nom</label>
+                        <input type="text" id="join-name" placeholder="Votre nom">
+                    </div>
+
+                    <div class="zoom-form-group">
+                        <label for="join-password">Mot de passe (optionnel)</label>
+                        <input type="password" id="join-password" placeholder="Mot de passe de la réunion">
+                    </div>
+                </div>
+
+                <!-- Aperçu de la caméra - Style Zoom -->
+                <div class="zoom-camera-preview-section">
+                    <h3>Prévisualisation</h3>
+                    <div class="zoom-camera-preview">
+                        <div class="camera-preview-container">
+                            <video id="camera-preview-video" autoplay muted playsinline></video>
+                            <div class="camera-preview-placeholder">
+                                <i class="fas fa-video-slash"></i>
+                                <span>Caméra désactivée</span>
+                            </div>
+                            <div class="camera-preview-overlay">
+                                <div class="camera-controls">
+                                    <button id="toggle-camera-preview" class="camera-control-btn active" title="Activer/Désactiver la caméra">
+                                        <i class="fas fa-video"></i>
+                                    </button>
+                                    <button id="toggle-mic-preview" class="camera-control-btn active" title="Activer/Désactiver le micro">
+                                        <i class="fas fa-microphone"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Options de connexion -->
+                    <div class="zoom-join-options">
+                        <label class="zoom-checkbox">
+                            <input type="checkbox" id="join-with-video" checked>
+                            <span class="checkmark"></span>
+                            Rejoindre avec la vidéo
+                        </label>
+                        <label class="zoom-checkbox">
+                            <input type="checkbox" id="join-with-audio" checked>
+                            <span class="checkmark"></span>
+                            Rejoindre avec l'audio
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="zoom-join-actions">
+                <button id="cancel-join-meeting-btn" class="zoom-cancel-btn">Annuler</button>
+                <button id="confirm-join-meeting-btn" class="zoom-join-btn">
+                    <i class="fas fa-video"></i>
+                    Rejoindre maintenant
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de création de réunion - Style Zoom -->
+    <div id="create-meeting-modal" class="modal hidden">
+        <div class="zoom-join-modal">
+            <div class="zoom-join-header">
+                <h2>Créer une réunion</h2>
+                <button class="zoom-close-btn" id="close-create-meeting-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="zoom-join-form">
+                <div class="zoom-form-group">
+                    <label for="create-meeting-title">Titre de la réunion</label>
+                    <input type="text" id="create-meeting-title" placeholder="Ma réunion">
+                </div>
+
+                <div class="zoom-form-group">
+                    <label for="create-meeting-name">Votre nom</label>
+                    <input type="text" id="create-meeting-name" placeholder="Votre nom">
+                </div>
+
+                <div class="zoom-form-group">
+                    <label for="create-meeting-password">Mot de passe <span style="color: red;">*</span></label>
+                    <input type="password" id="create-meeting-password" placeholder="........" required>
+                </div>
+
+                <!-- Options de la réunion -->
+                <div class="meeting-options">
+                    <div class="option-group">
+                        <label class="option-label">
+                            <input type="checkbox" id="mute-participants" checked>
+                            <span class="checkmark"></span>
+                            Couper le micro des participants à l'entrée
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">
+                            <input type="checkbox" id="disable-video-participants">
+                            <span class="checkmark"></span>
+                            Désactiver la vidéo des participants à l'entrée
+                        </label>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">
+                            <input type="checkbox" id="enable-waiting-room">
+                            <span class="checkmark"></span>
+                            Activer la salle d'attente
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Aperçu de la caméra - Style Zoom -->
+                <div class="zoom-camera-preview">
+                    <div class="camera-preview-container">
+                        <video id="create-camera-preview-video" autoplay muted playsinline></video>
+                        <div class="camera-preview-placeholder">
+                            <i class="fas fa-video-slash"></i>
+                        </div>
+                        <div class="camera-preview-overlay">
+                            <div class="camera-controls">
+                                <button id="toggle-create-camera-preview" class="camera-control-btn" title="Activer/Désactiver la caméra">
+                                    <i class="fas fa-video"></i>
+                                </button>
+                                <button id="toggle-create-mic-preview" class="camera-control-btn" title="Activer/Désactiver le micro">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="zoom-join-actions">
+                <button id="confirm-create-meeting-btn" class="zoom-join-btn">Créer la réunion</button>
+            </div>
+        </div>
+    </div>
+          
+
+    <!-- Conteneur de notifications -->
+    <div id="notifications" class="notifications-container"></div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="webrtc-functions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model chatmessage {
+  id              String            @id
+  meetingId       String
+  userId          String?
+  username        String
+  message         String
+  type            String            @default("text")
+  timestamp       DateTime          @default(now())
+  edited          Boolean           @default(false)
+  editedAt        DateTime?
+  instantmeeting  instantmeeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade, map: "ChatMessage_meetingId_fkey")
+  messagereaction messagereaction[]
+
+  @@index([meetingId], map: "ChatMessage_meetingId_idx")
+  @@index([timestamp], map: "ChatMessage_timestamp_idx")
+}
+
+model instantmeeting {
+  id                        String                      @id
+  title                     String
+  hostUsername              String
+  createdAt                 DateTime                    @default(now())
+  endedAt                   DateTime?
+  status                    String                      @default("active")
+  participantCount          Int                         @default(0)
+  chatmessage               chatmessage[]
+  instantmeetingparticipant instantmeetingparticipant[]
+  raisedhand                raisedhand[]
+
+  @@index([createdAt], map: "InstantMeeting_createdAt_idx")
+  @@index([status], map: "InstantMeeting_status_idx")
+}
+
+model instantmeetingparticipant {
+  id             String         @id
+  meetingId      String
+  userId         String?
+  username       String
+  joinedAt       DateTime       @default(now())
+  leftAt         DateTime?
+  isMuted        Boolean        @default(false)
+  isVideoEnabled Boolean        @default(true)
+  role           String         @default("participant")
+  instantmeeting instantmeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, map: "InstantMeetingParticipant_meetingId_fkey")
+
+  @@index([meetingId], map: "InstantMeetingParticipant_meetingId_idx")
+  @@index([userId], map: "InstantMeetingParticipant_userId_idx")
+}
+
+model meeting {
+  id                 String               @id
+  ownerId            String
+  title              String
+  description        String?
+  password           String?
+  scheduledFor       DateTime
+  durationMin        Int
+  status             String               @default("scheduled")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @default(now()) @updatedAt
+  user               user                 @relation(fields: [ownerId], references: [id], onDelete: Cascade, map: "Meeting_ownerId_fkey")
+  meetingparticipant meetingparticipant[]
+  recording          recording[]
+
+  @@index([ownerId], map: "Meeting_ownerId_idx")
+}
+
+model meetingparticipant {
+  id        String   @id
+  meetingId String
+  userId    String
+  role      String   @default("participant")
+  joinedAt  DateTime @default(now())
+  meeting   meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade, map: "MeetingParticipant_meetingId_fkey")
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "MeetingParticipant_userId_fkey")
+
+  @@unique([meetingId, userId], map: "MeetingParticipant_meetingId_userId_key")
+  @@index([userId], map: "MeetingParticipant_userId_idx")
+}
+
+model messagereaction {
+  id          String      @id
+  messageId   String
+  userId      String
+  emoji       String
+  createdAt   DateTime    @default(now())
+  chatmessage chatmessage @relation(fields: [messageId], references: [id], onDelete: Cascade, map: "MessageReaction_messageId_fkey")
+
+  @@unique([messageId, userId, emoji], map: "MessageReaction_messageId_userId_emoji_key")
+  @@index([messageId], map: "MessageReaction_messageId_idx")
+  @@index([userId], map: "MessageReaction_userId_idx")
+}
+
+model raisedhand {
+  id             String         @id
+  meetingId      String
+  userId         String?
+  username       String
+  raisedAt       DateTime       @default(now())
+  loweredAt      DateTime?
+  instantmeeting instantmeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, map: "RaisedHand_meetingId_fkey")
+
+  @@index([meetingId], map: "RaisedHand_meetingId_idx")
+  @@index([userId], map: "RaisedHand_userId_idx")
+}
+
+model recording {
+  id        String   @id
+  meetingId String
+  ownerId   String
+  filePath  String
+  fileSize  Int
+  startedAt DateTime
+  endedAt   DateTime
+  type      String   @default("both")
+  meeting   meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade, map: "Recording_meetingId_fkey")
+  user      user     @relation(fields: [ownerId], references: [id], onDelete: Cascade, map: "Recording_ownerId_fkey")
+
+  @@index([meetingId], map: "Recording_meetingId_idx")
+  @@index([ownerId], map: "Recording_ownerId_idx")
+}
+
+model refreshtoken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "RefreshToken_userId_fkey")
+
+  @@index([userId], map: "RefreshToken_userId_idx")
+}
+
+model session {
+  id           String   @id
+  userId       String
+  createdAt    DateTime @default(now())
+  lastActivity DateTime @default(now())
+  ip           String?
+  userAgent    String?
+  rememberMe   Boolean  @default(false)
+  user         user     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Session_userId_fkey")
+
+  @@index([userId], map: "Session_userId_idx")
+}
+
+model user {
+  id                 String               @id
+  username           String               @unique(map: "User_username_key")
+  email              String               @unique(map: "User_email_key")
+  password           String
+  role               String               @default("user")
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  lastLogin          DateTime?
+  firstName          String?
+  lastName           String?
+  avatar             String?
+  meeting            meeting[]
+  meetingparticipant meetingparticipant[]
+  recording          recording[]
+  refreshtoken       refreshtoken[]
+  session            session[]
+}

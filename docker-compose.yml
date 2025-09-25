@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: webrtc-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-webrtc_visioconf}
+      - MYSQL_USER=${MYSQL_USER:-webrtc}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-webrtcpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - webrtc-network
+
+  # Serveur de signalisation WebRTC
+  signal-server:
+    build: .
+    container_name: webrtc-signal-server
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - DATABASE_URL=mysql://webrtc:webrtcpassword@mysql:3306/webrtc_visioconf
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - webrtc-network
+
+  # Serveur TURN pour la traversée NAT
+  coturn:
+    image: instrumentisto/coturn:latest
+    container_name: webrtc-coturn
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp
+      - "49152-65535:49152-65535/udp"
+    environment:
+      - TURN_USERNAME=webrtc
+      - TURN_PASSWORD=1234
+      - TURN_REALM=webrtc.local
+      - TURN_SERVER_NAME=webrtc-turn
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf
+    restart: unless-stopped
+    networks:
+      - webrtc-network
+
+  # Interface d'administration (optionnel)
+  admin-panel:
+    image: nginx:alpine
+    container_name: webrtc-admin
+    ports:
+      - "8080:80"
+    volumes:
+      - ./admin:/usr/share/nginx/html
+    restart: unless-stopped
+    networks:
+      - webrtc-network
+
+networks:
+  webrtc-network:
+    driver: bridge
+
+volumes:
+  logs:
+  mysql_data:

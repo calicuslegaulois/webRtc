@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notifications</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10000;
+            font-weight: 500;
+            min-width: 250px;
+            animation: slideInRight 0.3s ease-out;
+        }
+        .notification.success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .notification.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test des Notifications</h1>
+        <p>Cliquez sur les boutons pour tester les notifications :</p>
+        
+        <button class="test-button" onclick="testNotification('info')">Test Notification Info</button>
+        <button class="test-button" onclick="testNotification('success')">Test Notification Succès</button>
+        <button class="test-button" onclick="testNotification('error')">Test Notification Erreur</button>
+        <button class="test-button" onclick="testLeaveMeeting()">Test Quitter Réunion</button>
+        <button class="test-button" onclick="testMultiple()">Test Multiple</button>
+        
+        <div id="log" style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-family: monospace; font-size: 12px;">
+            <strong>Log des notifications :</strong><br>
+        </div>
+    </div>
+
+    <script>
+        function showNotification(message, type = 'info') {
+            console.log(`📢 Notification [${type}]:`, message);
+            
+            // Ajouter au log
+            const log = document.getElementById('log');
+            log.innerHTML += `[${new Date().toLocaleTimeString()}] ${type.toUpperCase()}: ${message}<br>`;
+            log.scrollTop = log.scrollHeight;
+            
+            // Créer l'élément de notification
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Ajouter au body
+            document.body.appendChild(notification);
+            
+            // Supprimer après 4 secondes
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.animation = 'slideOutRight 0.3s ease-in';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 4000);
+        }
+
+        function testNotification(type) {
+            const messages = {
+                'info': 'Ceci est une notification d\'information',
+                'success': 'Ceci est une notification de succès',
+                'error': 'Ceci est une notification d\'erreur'
+            };
+            showNotification(messages[type], type);
+        }
+
+        function testLeaveMeeting() {
+            console.log('🚪 Test de quitter la réunion...');
+            
+            // Simulation du processus de quitter une réunion
+            showNotification('Quittement de la réunion en cours...', 'info');
+            
+            setTimeout(() => {
+                showNotification('admin a quitté la réunion', 'info');
+            }, 500);
+            
+            setTimeout(() => {
+                showNotification('Vous avez quitté la réunion avec succès', 'success');
+            }, 1500);
+        }
+
+        function testMultiple() {
+            showNotification('Première notification', 'info');
+            setTimeout(() => showNotification('Deuxième notification', 'success'), 1000);
+            setTimeout(() => showNotification('Troisième notification', 'error'), 2000);
+        }
+    </script>
+</body>
+</html>
