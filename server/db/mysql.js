@@ -16,11 +16,57 @@ class DatabaseManager {
    */
   getDatabaseConfig() {
     console.log('🏠 Configuration base de données');
+
+    // Priorité aux variables Railway MySQL si présentes
+    const rwHost = process.env.MYSQLHOST || process.env.MYSQL_HOST;
+    const rwUser = process.env.MYSQLUSER || process.env.MYSQL_USER;
+    const rwPassword = process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD;
+    const rwDatabase = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE;
+    const rwPort = process.env.MYSQLPORT || process.env.MYSQL_PORT;
+
+    // Variables génériques
+    const dbHost = process.env.DB_HOST;
+    const dbUser = process.env.DB_USER;
+    const dbPassword = process.env.DB_PASSWORD;
+    const dbName = process.env.DB_NAME;
+    const dbPort = process.env.DB_PORT;
+
+    // Support d'URL uniques (mysql://...)
+    let urlConfig = null;
+    const urlCandidate = process.env.DATABASE_URL 
+      || process.env.MYSQL_URL 
+      || process.env.URL_MYSQL 
+      || process.env.JAWSDB_URL 
+      || process.env.CLEARDB_DATABASE_URL;
+    if (urlCandidate && /^mysql:\/\//.test(urlCandidate)) {
+      try {
+        const u = new URL(urlCandidate);
+        urlConfig = {
+          host: u.hostname,
+          user: decodeURIComponent(u.username),
+          password: decodeURIComponent(u.password),
+          database: u.pathname.replace(/^\//, ''),
+          port: u.port ? parseInt(u.port, 10) : 3306
+        };
+      } catch (e) {
+        console.warn('⚠️ URL MySQL invalide, ignorée');
+      }
+    }
+
+    const host = (rwHost || dbHost || (urlConfig && urlConfig.host) || '127.0.0.1');
+    const user = (rwUser || dbUser || (urlConfig && urlConfig.user) || 'root');
+    const password = (rwPassword || dbPassword || (urlConfig && urlConfig.password) || '');
+    const database = (rwDatabase || dbName || (urlConfig && urlConfig.database) || 'webrtc_visioconf');
+    const port = parseInt(rwPort || dbPort || (urlConfig && urlConfig.port) || '3306', 10);
+
+    console.log(`🔧 DB cible: ${user}@${host}:${port}/${database}`);
+
     return {
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'webrtc_visioconf',
+      host,
+      user,
+      password,
+      database,
+      port,
       ssl: false
     };
   }
@@ -30,8 +76,13 @@ class DatabaseManager {
    */
   async getConnection() {
     if (!this.connection) {
-      this.connection = await mysql.createConnection(this.config);
-      console.log('🔌 Connexion à MySQL établie');
+      try {
+        this.connection = await mysql.createConnection(this.config);
+        console.log('🔌 Connexion à MySQL établie');
+      } catch (err) {
+        console.error('❌ Échec connexion MySQL:', err.message);
+        throw err;
+      }
     }
     return this.connection;
   }
