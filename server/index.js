@@ -1200,8 +1200,11 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+console.log(`🔧 PORT env détecté: ${process.env.PORT || '(non défini)'}`);
 server.listen(PORT, '0.0.0.0', () => {
+  const addr = server.address();
   console.log(`🚀 Serveur sécurisé démarré sur le port ${PORT}`);
+  console.log(`👂 Adresse effective: ${typeof addr === 'string' ? addr : `${addr.address}:${addr.port}`}`);
   console.log(`🔒 Sécurité: Helmet, CORS, JWT activés`);
   console.log(`📹 Gestion des réunions et salles activée`);
   console.log(`💬 Service de chat en temps réel activé`);
