@@ -43,6 +43,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+// Logger simple de requêtes
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    const durationMs = Date.now() - startedAt;
+    console.log(`➡️  ${req.method} ${req.originalUrl} -> ${res.statusCode} (${durationMs}ms)`);
+  });
+  next();
+});
+
 // Routes de santé / test
 app.get('/health', (req, res) => {
   console.log('🟢 Route /health appelée');
@@ -1195,6 +1205,37 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔒 Sécurité: Helmet, CORS, JWT activés`);
   console.log(`📹 Gestion des réunions et salles activée`);
   console.log(`💬 Service de chat en temps réel activé`);
+});
+
+// Timeouts HTTP sûrs pour proxy (éviter 502 keep-alive)
+try {
+  // Garder cohérents: headersTimeout légèrement > keepAliveTimeout
+  server.keepAliveTimeout = 65000; // 65s
+  server.headersTimeout = 66000;   // 66s
+  console.log('⏱️ Timeouts HTTP configurés (keepAlive: 65s, headers: 66s)');
+} catch (_) {}
+
+// Gestion des erreurs non capturées
+process.on('uncaughtException', (error) => {
+  console.error('❌ Exception non capturée:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Promise rejetée non gérée:', reason);
+});
+
+// 404 handler
+app.use((req, res) => {
+  console.warn(`⚠️  Route non trouvée: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: 'Not Found' });
+});
+
+// Middleware global de gestion d'erreurs
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('❌ Erreur non gérée middleware:', err);
+  if (res.headersSent) return; 
+  res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // Nettoyage périodique des chats anciens (toutes les heures)
